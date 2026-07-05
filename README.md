@@ -13,9 +13,9 @@ The team runs in this order, each stage streaming live and building on the last:
 5. **Fact-check** — every number and claim above gets marked Verified / Unverified / Likely-wrong
 6. **Judge** — weighs only what survived the fact-check and delivers the Decision Dossier
 
-Each agent (other than the Judge) can search the web for current figures via Claude's
-built-in web search tool, and is required to flag whether a number is current or
-unsure rather than guess.
+Each agent (other than the Judge) can search the web for current figures via Gemini's
+built-in Google Search grounding tool, and is required to flag whether a number is
+current or unsure rather than guess.
 
 ## Setup
 
@@ -25,8 +25,8 @@ source .venv/bin/activate
 pip install -r requirements.txt
 
 cp .env.example .env
-# edit .env and set ANTHROPIC_API_KEY
-export $(grep -v '^#' .env | xargs)   # or just `export ANTHROPIC_API_KEY=...`
+# edit .env and set GEMINI_API_KEY (get one at https://aistudio.google.com/apikey)
+export $(grep -v '^#' .env | xargs)   # or just `export GEMINI_API_KEY=...`
 ```
 
 ## Run
@@ -40,9 +40,10 @@ Room**. Each stage streams into its own card; the final Decision Dossier appears
 
 ## Notes
 
-- Uses `claude-opus-4-8` with adaptive thinking and Anthropic's server-side web search
-  tool — no separate financial-data API key needed.
-- This is a single-request, single-user demo server (synchronous Anthropic calls per
+- Uses Google's Gemini API (`gemini-2.5-pro` by default — override with the
+  `GEMINI_MODEL` env var) with the built-in Google Search grounding tool for current
+  figures — no separate financial-data API key needed.
+- This is a single-request, single-user demo server (synchronous Gemini calls per
   stage). It's not built for concurrent multi-user traffic.
 - Output is research, not investment advice. Verify anything time-sensitive before
   acting on it.

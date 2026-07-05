@@ -1,15 +1,16 @@
 """Agent definitions and orchestration for the equity-research War Room."""
 
+import os
 from dataclasses import dataclass
 from typing import Iterator
 
-import anthropic
+from google import genai
+from google.genai import types
 
-MODEL = "claude-opus-4-8"
-MAX_TOKENS = 8000
-MAX_CONTINUATIONS = 3
+MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.5-pro")
+MAX_OUTPUT_TOKENS = 8000
 
-WEB_SEARCH_TOOL = {"type": "web_search_20260209", "name": "web_search", "max_uses": 8}
+SEARCH_TOOL = types.Tool(google_search=types.GoogleSearch())
 
 COMMON_RULES = """\
 You are one seat at a coordinated equity-research "War Room" — a team of expert agents
@@ -192,8 +193,9 @@ decision."
 ]
 
 
-def _client() -> anthropic.Anthropic:
-    return anthropic.Anthropic()
+def _client() -> genai.Client:
+    # Reads GEMINI_API_KEY (or GOOGLE_API_KEY) from the environment.
+    return genai.Client()
 
 
 def run_stage(stage: Stage, company: str, case_file: str) -> Iterator[dict]:
@@ -214,42 +216,33 @@ def run_stage(stage: Stage, company: str, case_file: str) -> Iterator[dict]:
         )
     user_content += stage.prompt
 
-    messages = [{"role": "user", "content": user_content}]
-    tools = [WEB_SEARCH_TOOL] if stage.use_search else []
+    config = types.GenerateContentConfig(
+        system_instruction=COMMON_RULES,
+        max_output_tokens=MAX_OUTPUT_TOKENS,
+        tools=[SEARCH_TOOL] if stage.use_search else None,
+    )
 
     full_text = ""
-    continuations = 0
+    announced_search = False
 
-    while True:
-        kwargs = dict(
-            model=MODEL,
-            max_tokens=MAX_TOKENS,
-            system=COMMON_RULES,
-            messages=messages,
-            thinking={"type": "adaptive"},
-            output_config={"effort": "high"},
-        )
-        if tools:
-            kwargs["tools"] = tools
+    stream = client.models.generate_content_stream(
+        model=MODEL,
+        contents=user_content,
+        config=config,
+    )
+    for chunk in stream:
+        text = getattr(chunk, "text", None)
+        if text:
+            full_text += text
+            yield {"type": "delta", "text": text}
 
-        with client.messages.stream(**kwargs) as stream:
-            for event in stream:
-                if event.type == "content_block_start":
-                    if getattr(event.content_block, "type", None) == "server_tool_use":
-                        yield {"type": "search"}
-                elif event.type == "content_block_delta":
-                    if event.delta.type == "text_delta":
-                        full_text += event.delta.text
-                        yield {"type": "delta", "text": event.delta.text}
-            final = stream.get_final_message()
-
-        if final.stop_reason == "pause_turn":
-            continuations += 1
-            if continuations > MAX_CONTINUATIONS:
-                break
-            messages.append({"role": "assistant", "content": final.content})
-            continue
-
-        break
+        if not announced_search:
+            candidates = getattr(chunk, "candidates", None) or []
+            for candidate in candidates:
+                grounding = getattr(candidate, "grounding_metadata", None)
+                if grounding and getattr(grounding, "web_search_queries", None):
+                    announced_search = True
+                    yield {"type": "search"}
+                    break
 
     yield {"type": "done", "text": full_text}
