@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Equity Research War Room</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <header>
+    <h1>Equity Research War Room</h1>
+    <p class="subtitle">A coordinated team of research agents — not financial advice.</p>
+  </header>
+
+  <form id="run-form">
+    <input
+      id="company-input"
+      type="text"
+      placeholder="Company or ticker, e.g. Costco or COST"
+      autocomplete="off"
+      required
+    />
+    <button id="run-button" type="submit">Run the War Room</button>
+  </form>
+
+  <div id="status" class="status" hidden></div>
+
+  <main id="stages"></main>
+
+  <footer>
+    <p>
+      Research only. Prices and fundamentals change — verify anything that matters
+      before acting.
+    </p>
+  </footer>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
